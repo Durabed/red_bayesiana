@@ -1,0 +1,118 @@
+# Instalar el paquete bnlearn si aún no está instalado
+if (!requireNamespace("bnlearn", quietly = TRUE)) {
+  install.packages("bnlearn")
+}
+
+# Cargar el paquete bnlearn
+library(bnlearn)
+
+# Crear una red bayesiana vacía
+net <- empty.graph(nodes = c("Cost", "QualityLoss", "BestDecision"))
+
+# Establecer las relaciones entre los nodos
+arc.set <- matrix(c(
+  "Cost", "BestDecision",
+  "QualityLoss", "BestDecision"
+), byrow = TRUE, ncol = 2)
+arcs(net) <- arc.set
+
+# Crear la tabla de probabilidad condicional (CPT) para cada nodo
+cptCost <- matrix(c(0.5, 0.5), ncol = 2, dimnames = list(NULL, c("Low", "High")))
+cptQualityLoss <- matrix(c(0.7, 0.3), ncol = 2, dimnames = list(NULL, c("Yes", "No")))
+# Ajustar las probabilidades en la CPT de BestDecision
+cptBestDecision <- array(c(
+  # Cost = Low, QualityLoss = Yes
+  0.98, 0.02,
+  # Cost = High, QualityLoss = Yes
+  0.97, 0.03,
+  # Cost = Low, QualityLoss = No
+  0.99, 0.01,
+  # Cost = High, QualityLoss = No
+  0.97, 0.03
+), dim = c(2, 2, 2), dimnames = list(BestDecision = c("Durabed", "Other"), Cost = c("Low", "High"), QualityLoss = c("Yes", "No")))
+
+# Establecer las CPT en la red
+bn <- custom.fit(net, dist = list(Cost = cptCost, QualityLoss = cptQualityLoss, BestDecision = cptBestDecision))
+
+# Realizar inferencia
+result <- cpquery(bn, event = (BestDecision == "Durabed"), evidence = (Cost == "Low" & QualityLoss == "No"))
+print(paste("Probabilidad de que Durabed sea la mejor decisión con Costo Bajo y Sin Pérdida de Calidad: ", round(result * 100, 2), "%"))
+library(ggplot2)
+
+# Visualizar la Red Bayesiana
+bn.plot(bn, main = "Red Bayesiana Durabed")
+
+# Crear un data frame con los resultados de la consulta
+result_df <- data.frame(
+  BestDecision = c("Durabed", "Other"),
+  Probability = c(result, 1 - result)
+)
+
+# Visualizar el resultado de la consulta con ggplot2
+ggplot(result_df, aes(x = BestDecision, y = Probability)) +
+  geom_bar(stat = "identity", aes(fill = BestDecision)) +
+  geom_text(aes(label = scales::percent(Probability, accuracy = 0.01)), vjust = -0.5) +
+  scale_fill_manual(values = c("Durabed" = "blue", "Other" = "red")) +
+  labs(
+    title = "Probabilidad de que Durabed sea la mejor decisión",
+    x = "Decisión",
+    y = "Probabilidad",
+    fill = "Decisión"
+  ) +
+  theme_minimal()
+
+# Durabed cost and lifespan
+cost_durabed <- 2140
+lifespan_durabed <- 10
+
+# Cheap mattress cost range and lifespan
+cost_cheap_mattress_min <- 400
+cost_cheap_mattress_max <- 1200
+lifespan_cheap_mattress <- 1
+
+# Probabilidad de cambiar el colchón más barato después de 7 años
+prob_replace_after_7 <- 0.9
+
+# Calcular el costo total durante 10 años para Durabed
+total_cost_durabed <- cost_durabed
+
+# Calcular el costo total durante 10 años para colchones más baratos
+total_cost_cheap_mattress_min <- cost_cheap_mattress_min * 7 + cost_cheap_mattress_min * prob_replace_after_7 * 3
+total_cost_cheap_mattress_max <- cost_cheap_mattress_max * 7 + cost_cheap_mattress_max * prob_replace_after_7 * 3
+
+# Imprimir los costos totales
+print(paste("Costo total para Durabed durante 10 años: ", total_cost_durabed, "€"))
+print(paste("Costo total para colchón barato (min) durante 10 años: ", total_cost_cheap_mattress_min, "€"))
+print(paste("Costo total para colchón barato (max) durante 10 años: ", total_cost_cheap_mattress_max, "€"))
+# Cargar la biblioteca ggplot2
+library(ggplot2)
+# Gráfico 1: ROI de Durabed vs colchones más económicos durante 10 años
+
+roi_data <- data.frame(
+  Brand = c("Durabed", "Cheap Mattress Min", "Cheap Mattress Max"),
+  ROI = c(total_cost_durabed, total_cost_cheap_mattress_min, total_cost_cheap_mattress_max)
+)
+
+ggplot(roi_data, aes(x = Brand, y = ROI)) +
+  geom_bar(stat = "identity", aes(fill = Brand)) +
+  labs(title = "ROI de Durabed vs Colchones más económicos durante 10 años",
+       x = "Marca",
+       y = "Costo total durante 10 años (€)") +
+  theme_minimal()
+
+# Gráfico 2: Desglose del costo total durante 10 años
+
+cost_data <- data.frame(
+  Brand = rep(c("Durabed", "Cheap Mattress Min", "Cheap Mattress Max"), each = 2),
+  Type = rep(c("Initial Cost", "Additional Cost"), 3),
+  Cost = c(cost_durabed, 0,
+           cost_cheap_mattress_min * 7, cost_cheap_mattress_min * prob_replace_after_7 * 3,
+           cost_cheap_mattress_max * 7, cost_cheap_mattress_max * prob_replace_after_7 * 3)
+)
+
+ggplot(cost_data, aes(x = Brand, y = Cost, fill = Type)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Desglose del costo total durante 10 años",
+       x = "Marca",
+       y = "Costo (€)") +
+  theme_minimal()
